@@ -4,6 +4,7 @@ import requests
 from dotenv import load_dotenv
 import os
 import json
+import random
 #import sys
 
 load_dotenv() 
@@ -138,23 +139,82 @@ def get_team_week_score(team_id, week):
 
     return 0.0
 
-@bot.command(name="last", help="Show the teams fighting for last")
+def get_team_points_for_weeks(team_id, start_week=15, end_week=17):
+    """
+    Fetches the schedule data from ESPN and sums the team's points 
+    for matchupPeriodIds in the range [start_week..end_week].
+    """
+    url = f"https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leagues/{LEAGUE_ID}?view=mMatchupScore"
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json",
+    }
+    cookies = {
+        "espn_s2": ESPN_S2,
+        "SWID": SWID
+    }
+    response = requests.get(url, headers=headers, cookies=cookies)
+    response.raise_for_status()
+    league_data = response.json()
+
+    total_points = 0.0
+    for game in league_data.get("schedule", []):
+        week = game.get("matchupPeriodId")
+        if week is not None and start_week <= week <= end_week:
+            # Check home team
+            if game.get("home", {}).get("teamId") == team_id:
+                total_points += game["home"].get("totalPoints", 0.0)
+            # Check away team
+            if game.get("away", {}).get("teamId") == team_id:
+                total_points += game["away"].get("totalPoints", 0.0)
+
+    return total_points
+
+#@bot.command(name="last", help="Show the teams fighting for last")
+#async def last(ctx):
+#    # Define the team IDs you want to fetch
+#    team_ids = [3, 6, 7, 8, 12]  # Adjust as needed
+#
+#    # Get team names mapping
+#    team_names = get_team_name_map(LEAGUE_ID)
+#
+#    # Collect (team_name, points) for each team, adding the current week score
+#    team_points_list = []
+#    for tid in team_ids:
+#        # Get total season points
+#        points = get_team_points(tid)
+#        # Get current week's score and add it to total
+#        current_week_score = get_team_current_week_score(tid)
+#        total_with_current = points + current_week_score
+#
+#        team_name = team_names.get(tid, f"Team {tid}")
+#        team_points_list.append((team_name, total_with_current))
+#
+#    # Sort by points descending
+#    team_points_list.sort(key=lambda x: x[1], reverse=True)
+#
+#    # Format the response with two decimal places
+#    response_lines = [f"{t[0]}: {t[1]:.2f}" for t in team_points_list]
+#    response_message = "Points For Selected Teams (Highest to Lowest):\n" + "\n".join(response_lines)
+#
+#    await ctx.send(response_message)
+
+@bot.command(name="last", help="Show the teams fighting for last from weeks 15-17")
 async def last(ctx):
     # Define the team IDs you want to fetch
-    team_ids = [3, 6, 7, 8, 12]  # Adjust as needed
+    team_ids = [3, 6, 7, 8, 12]  # Replace with your desired team IDs
 
     # Get team names mapping
     team_names = get_team_name_map(LEAGUE_ID)
 
-    # Collect (team_name, points) for each team, adding the current week score
+    # Collect (team_name, points) for each team, specifically for weeks 15-17
     team_points_list = []
     for tid in team_ids:
-        # Get total season points
         points = get_team_points(tid)
-        # Get current week's score and add it to total
+       # Get current week's score and add it to total
         current_week_score = get_team_current_week_score(tid)
-        total_with_current = points + current_week_score
-
+        points_15_17 = get_team_points_for_weeks(tid, 15, 17)
+        total_with_current = points + current_week_score + points_15_17
         team_name = team_names.get(tid, f"Team {tid}")
         team_points_list.append((team_name, total_with_current))
 
@@ -163,7 +223,7 @@ async def last(ctx):
 
     # Format the response with two decimal places
     response_lines = [f"{t[0]}: {t[1]:.2f}" for t in team_points_list]
-    response_message = "Points For Selected Teams (Highest to Lowest):\n" + "\n".join(response_lines)
+    response_message = "Points from Weeks 15-17 (Highest to Lowest):\n" + "\n".join(response_lines)
 
     await ctx.send(response_message)
 
@@ -206,6 +266,39 @@ async def champions_command(ctx):
 @bot.command(name="GG", help="Replies with a greeting.")
 async def hello_command(ctx):
     await ctx.send("Channeling the fantasy football gods and increasing your odds of winning!")
+
+
+@bot.command(name="prediction", help="Predicts the score for a given team")
+async def predict_score(ctx, *, team_name: str):
+    """
+    Usage: !predictscore <team_name>
+    Example: !predictscore Any Given Sunday
+    """
+    # Fetch the map of team IDs to team names
+    team_name_map = get_team_name_map(LEAGUE_ID)
+    
+    # Invert the map for quick lookups {TeamNameString: TeamID}
+    inverted_map = {v: k for k, v in team_name_map.items()}
+    
+    # Normalize user input
+    input_name = team_name.strip()
+
+    # Check if the provided team name is valid
+    if input_name not in inverted_map:
+        await ctx.send(
+            f"Team '{team_name}' not found in ESPN data. "
+            f"Available teams: {', '.join(team_name_map.values())}"
+        )
+        return
+
+    # Generate a random float between 50 and 200
+    random_score = random.uniform(50, 200)
+
+    # Format the score to two decimal places
+    formatted_score = f"{random_score:.2f}"
+
+    # Send the prediction message
+    await ctx.send(f"**{input_name}** is projected to score **{formatted_score}** points next week!")
 
 bot.run(BOT_TOKEN)
 
