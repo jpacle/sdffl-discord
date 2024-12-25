@@ -199,7 +199,7 @@ def get_team_points_for_weeks(team_id, start_week=15, end_week=17):
 #
 #    await ctx.send(response_message)
 
-@bot.command(name="last", help="Show the teams fighting for last from weeks 15-17")
+@bot.command(name="last", help="Show the teams fighting for last")
 async def last(ctx):
     # Define the team IDs you want to fetch
     team_ids = [3, 6, 7, 8, 12]  # Replace with your desired team IDs
@@ -299,6 +299,22 @@ async def predict_score(ctx, *, team_name: str):
 
     # Send the prediction message
     await ctx.send(f"**{input_name}** is projected to score **{formatted_score}** points next week!")
+
+@bot.command(name="chance", help="Provides a random chance of winning today.")
+async def chance_command(ctx):
+    """
+    Usage: !chance
+    Returns: "Your chance of winning today is XX.XX%"
+    """
+
+    # Generate a random float between 0 and 100
+    random_percentage = random.uniform(0, 100)
+    
+    # Format to two decimal places
+    formatted_percentage = f"{random_percentage:.2f}"
+
+    # Send the response
+    await ctx.send(f"Your chance of winning today is {formatted_percentage}%")
 
 bot.run(BOT_TOKEN)
 
